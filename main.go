@@ -14,8 +14,9 @@ func main() {
 
 	fmt.Println("Searching through", compared)
 
-	err := compare.Compare(original, compared)
+	stat, err := compare.Compare(original, compared)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	fmt.Println(stat)
 }

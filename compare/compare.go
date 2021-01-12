@@ -16,10 +16,12 @@ const (
 	size    = 4000
 )
 
-func Compare(original string, compared string) error {
+func Compare(original string, compared string) (*Stat, error) {
+	stat := &Stat{}
+
 	// Ensure starting directories exist.
 	if err := directoriesExists(original, compared); err != nil {
-		return err
+		return nil, err
 	}
 
 	directories := collection.Stack{}
@@ -29,17 +31,17 @@ func Compare(original string, compared string) error {
 		// Read next directory on stack.
 		dir, err := directories.Pop()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Read contents of directories
 		orig, err := ioutil.ReadDir(filepath.Join(original, dir))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		comp, err := ioutil.ReadDir(filepath.Join(compared, dir))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		oIndex := 0
@@ -56,23 +58,26 @@ func Compare(original string, compared string) error {
 			if cInfo.IsDir() {
 				// Comparison failed on non-empty string.
 				if cmp := compareDirectories(oInfo, cInfo); cmp != "" {
+					stat.DiffDir()
 					printOutput(path, cmp)
 				} else {
 					directories.Push(path)
 				}
 			} else {
+				stat.AddSearched()
 				// Comparison failed on non-empty string.
 				cmp, err := compareFiles(original, compared, oInfo, cInfo, path)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if cmp != "" {
+					stat.DiffFile()
 					printOutput(path, cmp)
 				}
 			}
 		}
 	}
-	return nil
+	return stat, nil
 }
 
 func compareDirectories(oInfo os.FileInfo, cInfo os.FileInfo) string {
