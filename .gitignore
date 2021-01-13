@@ -2,3 +2,6 @@
 
 # Staging directory.
 /stage
+
+# Large collection of files for testing.
+/test/large/*

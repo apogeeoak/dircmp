@@ -114,13 +114,18 @@ func compareFiles(original string, compared string, oInfo os.FileInfo, cInfo os.
 	}
 	defer cFile.Close()
 
+	// Offset amount between reads to obtain equidistant samples. The last sample may not include the final few bytes.
+	offset := (oInfo.Size() - samples*size) / (samples - 1)
+
 	// Read files.
-	return compareFilesRead(oFile, cFile, size)
+	return compareFilesRead(oFile, cFile, size, offset)
 }
 
-func compareFilesRead(oFile *os.File, cFile *os.File, size int) (string, error) {
+func compareFilesRead(oFile *os.File, cFile *os.File, size int, offset int64) (string, error) {
 	oBytes := make([]byte, size)
 	cBytes := make([]byte, size)
+	// Ensure offset is positive.
+	offset = max(offset, 0)
 
 	for {
 		_, oErr := oFile.Read(oBytes)
@@ -144,6 +149,10 @@ func compareFilesRead(oFile *os.File, cFile *os.File, size int) (string, error) 
 		if !bytes.Equal(oBytes, cBytes) {
 			return "File content differs.", nil
 		}
+
+		// Offset both files relative to current position.
+		oFile.Seek(offset, 1)
+		cFile.Seek(offset, 1)
 	}
 }
 
@@ -159,6 +168,13 @@ func directoriesExists(directories ...string) error {
 
 func errNotDirectory(dir string) error {
 	return fmt.Errorf("%s: no such directory", dir)
+}
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func printOutput(path string, message string) {
