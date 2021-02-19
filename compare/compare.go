@@ -11,16 +11,11 @@ import (
 	"github.com/apogeeoak/dircmp/lib/collection"
 )
 
-const (
-	samples = 4
-	size    = 4000
-)
-
-func Compare(original string, compared string) (*Stat, error) {
+func Compare(config *Config) (*Stat, error) {
 	stat := &Stat{}
 
 	// Ensure starting directories exist.
-	if err := directoriesExists(original, compared); err != nil {
+	if err := directoriesExists(config.Original, config.Compared); err != nil {
 		return nil, err
 	}
 
@@ -35,11 +30,11 @@ func Compare(original string, compared string) (*Stat, error) {
 		}
 
 		// Read contents of directories
-		orig, err := ioutil.ReadDir(filepath.Join(original, dir))
+		orig, err := ioutil.ReadDir(filepath.Join(config.Original, dir))
 		if err != nil {
 			return nil, err
 		}
-		comp, err := ioutil.ReadDir(filepath.Join(compared, dir))
+		comp, err := ioutil.ReadDir(filepath.Join(config.Compared, dir))
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +61,7 @@ func Compare(original string, compared string) (*Stat, error) {
 			} else {
 				stat.AddSearched()
 				// Comparison failed on non-empty string.
-				cmp, err := compareFiles(original, compared, oInfo, cInfo, path)
+				cmp, err := compareFiles(config, oInfo, cInfo, path)
 				if err != nil {
 					return nil, err
 				}
@@ -88,9 +83,9 @@ func compareDirectories(oInfo os.FileInfo, cInfo os.FileInfo) string {
 	return ""
 }
 
-func compareFiles(original string, compared string, oInfo os.FileInfo, cInfo os.FileInfo, path string) (string, error) {
-	oPath := filepath.Join(original, path)
-	cPath := filepath.Join(compared, path)
+func compareFiles(config *Config, oInfo os.FileInfo, cInfo os.FileInfo, path string) (string, error) {
+	oPath := filepath.Join(config.Original, path)
+	cPath := filepath.Join(config.Compared, path)
 
 	// Comparison failed: File only in compared.
 	if oInfo == nil || oInfo.Name() != cInfo.Name() || oInfo.IsDir() {
@@ -114,18 +109,20 @@ func compareFiles(original string, compared string, oInfo os.FileInfo, cInfo os.
 	}
 	defer cFile.Close()
 
-	// Offset amount between reads to obtain equidistant samples. The last sample may not include the final few bytes.
-	offset := (oInfo.Size() - samples*size) / (samples - 1)
-
 	// Read files.
-	return compareFilesRead(oFile, cFile, size, offset)
+	return compareFilesRead(config, oFile, cFile)
 }
 
-func compareFilesRead(oFile *os.File, cFile *os.File, size int, offset int64) (string, error) {
-	oBytes := make([]byte, size)
-	cBytes := make([]byte, size)
+func compareFilesRead(config *Config, oFile *os.File, cFile *os.File) (string, error) {
+	info, err := oFile.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	oBytes := make([]byte, config.SampleSize)
+	cBytes := make([]byte, config.SampleSize)
 	// Ensure offset is positive.
-	offset = max(offset, 0)
+	offset := max(config.Offset(info.Size()), 0)
 
 	for {
 		_, oErr := oFile.Read(oBytes)

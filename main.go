@@ -3,18 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/apogeeoak/dircmp/compare"
 )
 
 func main() {
-	original := os.Args[1]
-	compared := os.Args[2]
+	config := compare.ParseConfig()
+	fmt.Println("Searching through", config.Compared)
 
-	fmt.Println("Searching through", compared)
-
-	stat, err := compare.Compare(original, compared)
+	stat, err := compare.Compare(config)
 	if err != nil {
 		log.Fatalln(err)
 	}
