@@ -5,3 +5,6 @@
 
 # Large collection of files for testing.
 /test/large/*
+
+# Visual Studio Code settings file.
+/.vscode/settings.json

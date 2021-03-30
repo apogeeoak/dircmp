@@ -6,7 +6,7 @@ import (
 	"github.com/apogeeoak/dircmp/compare"
 )
 
-func TestParseConfigSucceeds(t *testing.T) {
+func TestParseConfigBasic(t *testing.T) {
 	original := "../test/original"
 	compared := "../test/compared"
 
@@ -17,5 +17,18 @@ func TestParseConfigSucceeds(t *testing.T) {
 	}
 	if config.Compared != compared {
 		t.Fatalf("config.Compared improperly set. Wanted '%s'. Got '%s'.", compared, config.Compared)
+	}
+}
+
+func TestParseConfigEntire(t *testing.T) {
+	entire := "--entire"
+	dir := "../test"
+	want := int64(0)
+
+	config := compare.ParseConfigArgs("", []string{entire, dir, dir})
+	offset := config.Offset(1)
+
+	if offset != want {
+		t.Fatalf("config.Offset improperly set. Wanted '%v'. Got '%v'.", want, offset)
 	}
 }
