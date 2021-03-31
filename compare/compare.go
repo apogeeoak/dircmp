@@ -11,14 +11,13 @@ import (
 	"github.com/apogeeoak/dircmp/lib/collection"
 )
 
-func Compare(config *Config) (*Stat, error) {
-	stat := &Stat{}
-
+func CompareSync(config *Config) (*Stat, error) {
 	// Ensure starting directories exist.
 	if err := directoriesExists(config.Original, config.Compared); err != nil {
 		return nil, err
 	}
 
+	stat := &Stat{}
 	directories := collection.Stack{}
 	directories.Push("")
 
@@ -29,7 +28,7 @@ func Compare(config *Config) (*Stat, error) {
 			return nil, err
 		}
 
-		// Read contents of directories
+		// Read contents of directories.
 		orig, err := os.ReadDir(filepath.Join(config.Original, dir))
 		if err != nil {
 			return nil, err

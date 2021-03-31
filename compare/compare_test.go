@@ -8,11 +8,11 @@ import (
 	"github.com/apogeeoak/dircmp/lib/test"
 )
 
-func TestCompareBasic(t *testing.T) {
+func TestCompareSyncBasic(t *testing.T) {
 	config := setupConfigBasic()
 	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different"
 
-	stat, err := compare.Compare(config)
+	stat, err := compare.CompareSync(config)
 
 	if err != nil {
 		t.Fatal("Error:", err)
@@ -22,11 +22,11 @@ func TestCompareBasic(t *testing.T) {
 	}
 }
 
-func TestCompareLarge(t *testing.T) {
+func TestCompareSyncLarge(t *testing.T) {
 	config := setupConfigLarge()
 	want := regexp.MustCompile(`Searched [[:digit:]]+ file.*, 0 file.* different, 0 director.* different, 0 total .* different`)
 
-	stat, err := compare.Compare(config)
+	stat, err := compare.CompareSync(config)
 
 	if err != nil {
 		t.Fatal("Error:", err)
@@ -36,14 +36,14 @@ func TestCompareLarge(t *testing.T) {
 	}
 }
 
-func TestCompareEntire(t *testing.T) {
+func TestCompareSyncEntire(t *testing.T) {
 	// Require the long flag to be set in order to run this long running test.
 	test.RequireLong(t)
 
 	config := setupConfigEntire()
 	want := regexp.MustCompile(`Searched [[:digit:]]+ file.*, 0 file.* different, 0 director.* different, 0 total .* different`)
 
-	stat, err := compare.Compare(config)
+	stat, err := compare.CompareSync(config)
 
 	if err != nil {
 		t.Fatal("Error:", err)
@@ -53,25 +53,25 @@ func TestCompareEntire(t *testing.T) {
 	}
 }
 
-func BenchmarkCompareBasic(b *testing.B) {
+func BenchmarkCompareSyncBasic(b *testing.B) {
 	defer test.Quiet()()
 	config := setupConfigBasic()
 
 	for i := 0; i < b.N; i++ {
-		compare.Compare(config)
+		compare.CompareSync(config)
 	}
 }
 
-func BenchmarkCompareLarge(b *testing.B) {
+func BenchmarkCompareSyncLarge(b *testing.B) {
 	defer test.Quiet()()
 	config := setupConfigLarge()
 
 	for i := 0; i < b.N; i++ {
-		compare.Compare(config)
+		compare.CompareSync(config)
 	}
 }
 
-func BenchmarkCompareEntire(b *testing.B) {
+func BenchmarkCompareSyncEntire(b *testing.B) {
 	// Require the long flag to be set in order to run this long running benchmark.
 	test.RequireLongBenchmark(b)
 
@@ -79,7 +79,7 @@ func BenchmarkCompareEntire(b *testing.B) {
 	config := setupConfigEntire()
 
 	for i := 0; i < b.N; i++ {
-		compare.Compare(config)
+		compare.CompareSync(config)
 	}
 }
 
