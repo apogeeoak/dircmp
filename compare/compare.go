@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -30,29 +30,29 @@ func Compare(config *Config) (*Stat, error) {
 		}
 
 		// Read contents of directories
-		orig, err := ioutil.ReadDir(filepath.Join(config.Original, dir))
+		orig, err := os.ReadDir(filepath.Join(config.Original, dir))
 		if err != nil {
 			return nil, err
 		}
-		comp, err := ioutil.ReadDir(filepath.Join(config.Compared, dir))
+		comp, err := os.ReadDir(filepath.Join(config.Compared, dir))
 		if err != nil {
 			return nil, err
 		}
 
 		oIndex := 0
-		for _, cInfo := range comp {
-			path := filepath.Join(dir, cInfo.Name())
+		for _, cEntry := range comp {
+			path := filepath.Join(dir, cEntry.Name())
 
-			// Search for original FileInfo that matches compared FileInfo.
-			var oInfo os.FileInfo
-			for ; oIndex < len(orig) && orig[oIndex].Name() <= cInfo.Name(); oIndex++ {
-				oInfo = orig[oIndex]
+			// Search for original entry that matches compared entry.
+			var oEntry fs.DirEntry
+			for ; oIndex < len(orig) && orig[oIndex].Name() <= cEntry.Name(); oIndex++ {
+				oEntry = orig[oIndex]
 			}
 
 			// Branch on directory or file.
-			if cInfo.IsDir() {
+			if cEntry.IsDir() {
 				// Comparison failed on non-empty string.
-				if cmp := compareDirectories(oInfo, cInfo); cmp != "" {
+				if cmp := compareDirectories(oEntry, cEntry); cmp != "" {
 					stat.DiffDir()
 					printOutput(path, cmp)
 				} else {
@@ -61,7 +61,7 @@ func Compare(config *Config) (*Stat, error) {
 			} else {
 				stat.AddSearched()
 				// Comparison failed on non-empty string.
-				cmp, err := compareFiles(config, oInfo, cInfo, path)
+				cmp, err := compareFiles(config, oEntry, cEntry, path)
 				if err != nil {
 					return nil, err
 				}
@@ -75,21 +75,28 @@ func Compare(config *Config) (*Stat, error) {
 	return stat, nil
 }
 
-func compareDirectories(oInfo os.FileInfo, cInfo os.FileInfo) string {
+func compareDirectories(orig fs.DirEntry, comp fs.DirEntry) string {
 	// Comparison failed: Directory only in compared.
-	if oInfo == nil || oInfo.Name() != cInfo.Name() || !oInfo.IsDir() {
+	if orig == nil || orig.Name() != comp.Name() || !orig.IsDir() {
 		return "Directory only in compared"
 	}
 	return ""
 }
 
-func compareFiles(config *Config, oInfo os.FileInfo, cInfo os.FileInfo, path string) (string, error) {
-	oPath := filepath.Join(config.Original, path)
-	cPath := filepath.Join(config.Compared, path)
-
+func compareFiles(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string) (string, error) {
 	// Comparison failed: File only in compared.
-	if oInfo == nil || oInfo.Name() != cInfo.Name() || oInfo.IsDir() {
+	if orig == nil || orig.Name() != comp.Name() || orig.IsDir() {
 		return "File only in compared.", nil
+	}
+
+	// Determine file size from FileInfo.
+	oInfo, err := orig.Info()
+	if err != nil {
+		return "", err
+	}
+	cInfo, err := comp.Info()
+	if err != nil {
+		return "", err
 	}
 
 	// Comparison failed: File sizes differs.
@@ -97,36 +104,32 @@ func compareFiles(config *Config, oInfo os.FileInfo, cInfo os.FileInfo, path str
 		return "File sizes differs.", nil
 	}
 
+	// Ensure offset is positive.
+	offset := max(config.Offset(oInfo.Size()), 0)
+
 	// Open files.
-	oFile, err := os.Open(oPath)
+	oFile, err := os.Open(filepath.Join(config.Original, path))
 	if err != nil {
 		return "", err
 	}
 	defer oFile.Close()
-	cFile, err := os.Open(cPath)
+	cFile, err := os.Open(filepath.Join(config.Compared, path))
 	if err != nil {
 		return "", err
 	}
 	defer cFile.Close()
 
 	// Read files.
-	return compareFilesRead(config, oFile, cFile)
+	return compareFilesRead(config, oFile, cFile, offset)
 }
 
-func compareFilesRead(config *Config, oFile *os.File, cFile *os.File) (string, error) {
-	info, err := oFile.Stat()
-	if err != nil {
-		return "", err
-	}
-
+func compareFilesRead(config *Config, orig *os.File, comp *os.File, offset int64) (string, error) {
 	oBytes := make([]byte, config.SampleSize)
 	cBytes := make([]byte, config.SampleSize)
-	// Ensure offset is positive.
-	offset := max(config.Offset(info.Size()), 0)
 
 	for {
-		_, oErr := oFile.Read(oBytes)
-		_, cErr := cFile.Read(cBytes)
+		_, oErr := orig.Read(oBytes)
+		_, cErr := comp.Read(cBytes)
 
 		// Error conditions.
 		if oErr != nil || cErr != nil {
@@ -148,8 +151,8 @@ func compareFilesRead(config *Config, oFile *os.File, cFile *os.File) (string, e
 		}
 
 		// Offset both files relative to current position.
-		oFile.Seek(offset, 1)
-		cFile.Seek(offset, 1)
+		orig.Seek(offset, 1)
+		comp.Seek(offset, 1)
 	}
 }
 
