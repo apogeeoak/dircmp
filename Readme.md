@@ -18,8 +18,12 @@ To only run benchmarks (without tests):
 
 To run all tests (including long tests):
 
-`go test ./compare -long`
+`go test ./compare/ -long`
 
 To run all benchmarks (including long benchmarks but not tests):
 
 `go test ./compare/ -run ! -bench . -long`
+
+### Benchmarks
+
+Some benchmarks require a `large` directory in the `test` directory (`./test/large/`) that contains many large files. The `large` directory should contain a nested hierarchy of directories also containing large files. Any file with a file size greater than 1 MB is sufficient. The `large` directory should exceed 1 GB to ensure reliable results. The `large` directory is intentionally ignored by `git`.

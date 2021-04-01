@@ -11,9 +11,9 @@ func main() {
 	config := compare.ParseConfig()
 	fmt.Println("Searching through", config.Compared)
 
-	stat, err := compare.CompareSync(config)
+	stats, err := compare.Compare(config)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println(stat)
+	fmt.Println(stats)
 }
