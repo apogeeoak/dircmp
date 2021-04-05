@@ -10,11 +10,11 @@ type Result struct {
 }
 
 func Error(err error) Result {
-	return Result{Error: err}
+	return Result{Error: err, Stat: StatError}
 }
 
-func Output(output, path string) Result {
-	return Result{Output: output, Path: path}
+func Output(output, path string, stat StatType) Result {
+	return Result{Output: output, Path: path, Stat: stat}
 }
 
 func Stat(stat StatType) Result {
@@ -23,11 +23,11 @@ func Stat(stat StatType) Result {
 
 func (r Result) String() string {
 	if r.Error != nil {
-		return "ERROR: " + r.Error.Error()
-	} else if r.Stat != None {
-		return r.Stat.String()
+		return "Error: " + r.Error.Error()
 	} else if r.Output != "" {
 		return fmt.Sprintf("%-30s | %s", r.Output, r.Path)
+	} else if r.Stat != StatNone {
+		return r.Stat.String()
 	}
 	return "Empty Result."
 }

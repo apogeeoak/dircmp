@@ -10,7 +10,7 @@ import (
 
 func TestCompareSyncBasic(t *testing.T) {
 	config := setupConfigBasic()
-	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different."
+	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 0 error(s)."
 
 	stats, err := compare.CompareSync(config)
 	fmt.Println(stats)
@@ -52,6 +52,21 @@ func TestCompareSyncEntire(t *testing.T) {
 		t.Fatal("Error:", err)
 	}
 	if !want.MatchString(stats.String()) {
+		t.Fatalf("Wanted '%s'. Got '%s'.", want, stats)
+	}
+}
+
+func TestCompareSyncError(t *testing.T) {
+	config := setupConfigError()
+	want := "Searched 9 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 2 error(s)."
+
+	stats, err := compare.CompareSync(config)
+	fmt.Println(stats)
+
+	if err != nil {
+		t.Fatal("Error:", err)
+	}
+	if stats.String() != want {
 		t.Fatalf("Wanted '%s'. Got '%s'.", want, stats)
 	}
 }

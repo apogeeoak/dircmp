@@ -34,13 +34,7 @@ func Compare(config *Config) (*Stats, error) {
 
 	// Listen for results.
 	for result := range channel {
-		if result.Error != nil {
-			fmt.Fprintln(os.Stderr, result)
-		} else if result.Stat != None {
-			stats.Add(result.Stat)
-		} else {
-			fmt.Println(result)
-		}
+		process(result, stats)
 	}
 	return stats, nil
 }
@@ -85,8 +79,7 @@ func compareDirectoriesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry,
 
 	// Comparison failed on non-empty string.
 	if cmp := compareDirectories(orig, comp); cmp != "" {
-		channel <- Stat(DifferentDirectory)
-		channel <- Output(cmp, path)
+		channel <- Output(cmp, path, StatDifferentDirectory)
 	} else {
 		wait.Add(1)
 		go compare(config, path, channel, wait)
@@ -95,15 +88,14 @@ func compareDirectoriesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry,
 
 func compareFilesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
 	defer wait.Done()
-	channel <- Stat(SearchedFile)
+	channel <- Stat(StatSearchedFile)
 
 	// Comparison failed on non-empty string.
 	cmp, err := compareFiles(config, orig, comp, path)
 	if err != nil {
 		channel <- Error(err)
 	} else if cmp != "" {
-		channel <- Stat(DifferentFile)
-		channel <- Output(cmp, path)
+		channel <- Output(cmp, path, StatDifferentFile)
 	}
 }
 
@@ -185,6 +177,15 @@ func compareFilesRead(config *Config, orig *os.File, comp *os.File, offset int64
 		// Offset both files relative to current position.
 		orig.Seek(offset, 1)
 		comp.Seek(offset, 1)
+	}
+}
+
+func process(result Result, stats *Stats) {
+	stats.Add(result.Stat)
+	if result.Error != nil {
+		fmt.Fprintln(os.Stderr, result)
+	} else if result.Output != "" {
+		fmt.Println(result)
 	}
 }
 

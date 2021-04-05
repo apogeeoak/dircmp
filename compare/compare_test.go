@@ -11,7 +11,7 @@ import (
 
 func TestCompareBasic(t *testing.T) {
 	config := setupConfigBasic()
-	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different."
+	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 0 error(s)."
 
 	stats, err := compare.Compare(config)
 	fmt.Println(stats)
@@ -57,6 +57,21 @@ func TestCompareEntire(t *testing.T) {
 	}
 }
 
+func TestCompareError(t *testing.T) {
+	config := setupConfigError()
+	want := "Searched 9 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 2 error(s)."
+
+	stats, err := compare.Compare(config)
+	fmt.Println(stats)
+
+	if err != nil {
+		t.Fatal("Error:", err)
+	}
+	if stats.String() != want {
+		t.Fatalf("Wanted '%s'. Got '%s'.", want, stats)
+	}
+}
+
 func BenchmarkCompareBasic(b *testing.B) {
 	defer test.Quiet()()
 	config := setupConfigBasic()
@@ -87,7 +102,7 @@ func BenchmarkCompareEntire(b *testing.B) {
 	}
 }
 
-var compareSameRegex = regexp.MustCompile(`Searched [[:digit:]]+ file.*, 0 file.* different, 0 director.* different, 0 total .* different`)
+var compareSameRegex = regexp.MustCompile(`Searched [[:digit:]]+ file.*, 0 file.* different, 0 director.* different, 0 total .* different. 0 error.*`)
 
 func setupConfigBasic() *compare.Config {
 	original := "../test/original"
@@ -103,4 +118,10 @@ func setupConfigLarge() *compare.Config {
 func setupConfigEntire() *compare.Config {
 	large := "../test/large"
 	return compare.ParseConfigArgs("", []string{"--entire", large, large})
+}
+
+func setupConfigError() *compare.Config {
+	original := "../test/original"
+	compared := "../test/errors"
+	return compare.ParseConfigArgs("", []string{original, compared})
 }
