@@ -16,7 +16,8 @@ type Config struct {
 	Original string
 	Compared string
 
-	SampleSize int
+	Limit      uint
+	SampleSize uint
 	Offset     offsetFunc
 }
 
@@ -39,13 +40,17 @@ func ParseConfigArgs(name string, args []string) *Config {
 	flags.BoolVar(&version, "V", version, version_usage)
 	flags.BoolVar(&version, "version", version, version_usage)
 
-	samples := 4
-	samples_usage := "Number of samples to take."
-	flags.IntVar(&samples, "samples", samples, samples_usage)
+	limit := uint(20)
+	limit_usage := "Limit concurrent processes."
+	flags.UintVar(&limit, "limit", limit, limit_usage)
 
-	sampleSize := 4000
+	samples := uint(4)
+	samples_usage := "Number of samples to take."
+	flags.UintVar(&samples, "samples", samples, samples_usage)
+
+	sampleSize := uint(4000)
 	size_usage := "Size of samples."
-	flags.IntVar(&sampleSize, "size", sampleSize, size_usage)
+	flags.UintVar(&sampleSize, "size", sampleSize, size_usage)
 
 	// Parse flags.
 	flags.Parse(args)
@@ -68,7 +73,7 @@ func ParseConfigArgs(name string, args []string) *Config {
 
 	offset := offset(entire, samples, sampleSize)
 
-	return &Config{original, compared, sampleSize, offset}
+	return &Config{original, compared, limit, sampleSize, offset}
 }
 
 func failf(format string, a ...interface{}) {
@@ -79,7 +84,7 @@ func failf(format string, a ...interface{}) {
 	os.Exit(2)
 }
 
-func offset(entire bool, samples int, sampleSize int) offsetFunc {
+func offset(entire bool, samples uint, sampleSize uint) offsetFunc {
 	// No offset if entire flag is set to read entire file.
 	if entire {
 		return func(int64) int64 { return 0 }

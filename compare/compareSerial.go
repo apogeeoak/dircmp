@@ -22,54 +22,52 @@ func CompareSerial(config *Config) (*Stats, error) {
 	// Iterate through directories in stack.
 	for dir, err := directories.Pop(); err == nil; dir, err = directories.Pop() {
 		// Read contents of directories.
-		orig, err := os.ReadDir(filepath.Join(config.Original, dir))
+		oEntries, err := os.ReadDir(filepath.Join(config.Original, dir))
 		if err != nil {
 			process(Error(err), stats)
 			continue
 		}
-		comp, err := os.ReadDir(filepath.Join(config.Compared, dir))
+		cEntries, err := os.ReadDir(filepath.Join(config.Compared, dir))
 		if err != nil {
 			process(Error(err), stats)
 			continue
 		}
 
 		oIndex := 0
-		for _, cEntry := range comp {
-			path := filepath.Join(dir, cEntry.Name())
+		for _, comp := range cEntries {
+			path := filepath.Join(dir, comp.Name())
 
 			// Search for original entry that matches compared entry.
-			var oEntry fs.DirEntry
-			for ; oIndex < len(orig) && orig[oIndex].Name() <= cEntry.Name(); oIndex++ {
-				oEntry = orig[oIndex]
+			var orig fs.DirEntry
+			for ; oIndex < len(oEntries) && oEntries[oIndex].Name() <= comp.Name(); oIndex++ {
+				orig = oEntries[oIndex]
 			}
+			entry := NewEntry(orig, comp, path)
 
 			// Branch on directory or file.
-			if cEntry.IsDir() {
-				compareDirectoriesSerial(config, oEntry, cEntry, path, directories, stats)
+			if comp.IsDir() {
+				compareDirectoriesSerial(config, entry, directories, stats)
 			} else {
-				compareFilesSerial(config, oEntry, cEntry, path, stats)
+				compareFilesSerial(config, entry, stats)
 			}
 		}
 	}
 	return stats, nil
 }
 
-func compareDirectoriesSerial(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, directories *collection.Stack, stats *Stats) {
-	// Comparison failed on non-empty string.
-	if cmp := compareDirectories(orig, comp); cmp != "" {
-		process(Output(cmp, path, StatDifferentDirectory), stats)
+func compareDirectoriesSerial(config *Config, entry Entry, directories *collection.Stack, stats *Stats) {
+	// Comparison failed if result is not empty.
+	if result := compareDirectories(entry); !result.IsEmpty() {
+		process(result, stats)
 	} else {
-		directories.Push(path)
+		directories.Push(entry.Path)
 	}
 }
 
-func compareFilesSerial(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, stats *Stats) {
+func compareFilesSerial(config *Config, entry Entry, stats *Stats) {
 	stats.Add(StatSearchedFile)
-	// Comparison failed on non-empty string.
-	cmp, err := compareFiles(config, orig, comp, path)
-	if err != nil {
-		process(Error(err), stats)
-	} else if cmp != "" {
-		process(Output(cmp, path, StatDifferentFile), stats)
+	// Comparison failed if result is not empty.
+	if result := compareFiles(config, entry); !result.IsEmpty() {
+		process(result, stats)
 	}
 }

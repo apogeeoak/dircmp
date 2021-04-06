@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/apogeeoak/dircmp/lib/collection"
 )
 
 func Compare(config *Config) (*Stats, error) {
@@ -18,136 +20,146 @@ func Compare(config *Config) (*Stats, error) {
 
 	// Initialize.
 	stats := &Stats{}
-	channel := make(chan Result)
+	entries := make(chan Entry)
+	results := make(chan Result)
 	wait := &sync.WaitGroup{}
-	dir := ""
 
-	// Start comparison.
-	wait.Add(1)
-	go compare(config, dir, channel, wait)
+	// Start reading directories.
+	go readDirectories(config, entries, results)
 
-	// Close channel when comparsion is done.
+	// Start file comparison goroutines.
+	limit := int(config.Limit)
+	wait.Add(limit)
+	for i := 0; i < limit; i++ {
+		go func() {
+			defer wait.Done()
+			compareFilesParallel(config, entries, results)
+		}()
+	}
+
+	// Close results when comparsion is done.
 	go func() {
 		wait.Wait()
-		close(channel)
+		close(results)
 	}()
 
 	// Listen for results.
-	for result := range channel {
+	for result := range results {
 		process(result, stats)
 	}
 	return stats, nil
 }
 
-func compare(config *Config, dir string, channel chan Result, wait *sync.WaitGroup) {
-	defer wait.Done()
+func readDirectories(config *Config, entries chan<- Entry, results chan<- Result) {
+	defer close(entries)
 
-	// Read contents of directories
-	orig, err := os.ReadDir(filepath.Join(config.Original, dir))
-	if err != nil {
-		channel <- Error(err)
-		return
-	}
-	comp, err := os.ReadDir(filepath.Join(config.Compared, dir))
-	if err != nil {
-		channel <- Error(err)
-		return
-	}
+	directories := &collection.Stack{}
+	directories.Push("")
 
-	wait.Add(len(comp))
-	oIndex := 0
-	for _, cEntry := range comp {
-		path := filepath.Join(dir, cEntry.Name())
-
-		// Search for original entry that matches compared entry.
-		var oEntry fs.DirEntry
-		for ; oIndex < len(orig) && orig[oIndex].Name() <= cEntry.Name(); oIndex++ {
-			oEntry = orig[oIndex]
+	// Iterate through directories in stack.
+	for dir, err := directories.Pop(); err == nil; dir, err = directories.Pop() {
+		// Read contents of directories.
+		oEntries, err := os.ReadDir(filepath.Join(config.Original, dir))
+		if err != nil {
+			results <- Error(err)
+			continue
+		}
+		cEntries, err := os.ReadDir(filepath.Join(config.Compared, dir))
+		if err != nil {
+			results <- Error(err)
+			continue
 		}
 
-		// Branch on directory or file.
-		if cEntry.IsDir() {
-			compareDirectoriesParallel(config, oEntry, cEntry, path, channel, wait)
-		} else {
-			go compareFilesParallel(config, oEntry, cEntry, path, channel, wait)
+		oIndex := 0
+		for _, comp := range cEntries {
+			path := filepath.Join(dir, comp.Name())
+
+			// Search for original entry that matches compared entry.
+			var orig fs.DirEntry
+			for ; oIndex < len(oEntries) && oEntries[oIndex].Name() <= comp.Name(); oIndex++ {
+				orig = oEntries[oIndex]
+			}
+			entry := NewEntry(orig, comp, path)
+
+			// Branch on directory or file.
+			if comp.IsDir() {
+				compareDirectoriesParallel(config, entry, directories, results)
+			} else {
+				entries <- entry
+			}
 		}
 	}
 }
 
-func compareDirectoriesParallel(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
-	defer wait.Done()
-
-	// Comparison failed on non-empty string.
-	if cmp := compareDirectories(orig, comp); cmp != "" {
-		channel <- Output(cmp, path, StatDifferentDirectory)
+func compareDirectoriesParallel(config *Config, entry Entry, directories *collection.Stack, results chan<- Result) {
+	// Comparison failed if result is not empty.
+	if result := compareDirectories(entry); !result.IsEmpty() {
+		results <- result
 	} else {
-		wait.Add(1)
-		go compare(config, path, channel, wait)
+		directories.Push(entry.Path)
 	}
 }
 
-func compareFilesParallel(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
-	defer wait.Done()
-	channel <- Stat(StatSearchedFile)
+func compareFilesParallel(config *Config, entries <-chan Entry, results chan<- Result) {
+	for entry := range entries {
+		results <- Stat(StatSearchedFile)
 
-	// Comparison failed on non-empty string.
-	cmp, err := compareFiles(config, orig, comp, path)
-	if err != nil {
-		channel <- Error(err)
-	} else if cmp != "" {
-		channel <- Output(cmp, path, StatDifferentFile)
+		// Comparison failed if result is not empty.
+		if result := compareFiles(config, entry); !result.IsEmpty() {
+			results <- result
+		}
 	}
 }
 
-func compareDirectories(orig fs.DirEntry, comp fs.DirEntry) string {
+func compareDirectories(e Entry) Result {
 	// Comparison failed: Directory only in compared.
-	if orig == nil || orig.Name() != comp.Name() || !orig.IsDir() {
-		return "Directory only in compared."
+	if e.Original == nil || e.Original.Name() != e.Compared.Name() || !e.Original.IsDir() {
+		return Output("Directory only in compared.", e.Path, StatDifferentDirectory)
 	}
-	return ""
+	return Empty()
 }
 
-func compareFiles(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string) (string, error) {
+func compareFiles(config *Config, e Entry) Result {
 	// Comparison failed: File only in compared.
-	if orig == nil || orig.Name() != comp.Name() || orig.IsDir() {
-		return "File only in compared.", nil
+	if e.Original == nil || e.Original.Name() != e.Compared.Name() || e.Original.IsDir() {
+		return Output("File only in compared.", e.Path, StatDifferentFile)
 	}
 
 	// Determine file size from FileInfo.
-	oInfo, err := orig.Info()
+	oInfo, err := e.Original.Info()
 	if err != nil {
-		return "", err
+		return Error(err)
 	}
-	cInfo, err := comp.Info()
+	cInfo, err := e.Compared.Info()
 	if err != nil {
-		return "", err
+		return Error(err)
 	}
 
 	// Comparison failed: File sizes differ.
 	if oInfo.Size() != cInfo.Size() {
-		return "File sizes differ.", nil
+		return Output("File size differs.", e.Path, StatDifferentFile)
 	}
 
 	// Ensure offset is positive.
 	offset := max(config.Offset(oInfo.Size()), 0)
 
 	// Open files.
-	oFile, err := os.Open(filepath.Join(config.Original, path))
+	orig, err := os.Open(filepath.Join(config.Original, e.Path))
 	if err != nil {
-		return "", err
+		return Error(err)
 	}
-	defer oFile.Close()
-	cFile, err := os.Open(filepath.Join(config.Compared, path))
+	defer orig.Close()
+	comp, err := os.Open(filepath.Join(config.Compared, e.Path))
 	if err != nil {
-		return "", err
+		return Error(err)
 	}
-	defer cFile.Close()
+	defer comp.Close()
 
 	// Read files.
-	return compareFilesRead(config, oFile, cFile, offset)
+	return compareFilesRead(config, orig, comp, e.Path, offset)
 }
 
-func compareFilesRead(config *Config, orig io.ReadSeeker, comp io.ReadSeeker, offset int64) (string, error) {
+func compareFilesRead(config *Config, orig io.ReadSeeker, comp io.ReadSeeker, path string, offset int64) Result {
 	oBytes := make([]byte, config.SampleSize)
 	cBytes := make([]byte, config.SampleSize)
 
@@ -159,19 +171,19 @@ func compareFilesRead(config *Config, orig io.ReadSeeker, comp io.ReadSeeker, of
 		if oErr != nil || cErr != nil {
 			// Comparison succeeded.
 			if oErr == io.EOF && cErr == io.EOF {
-				return "", nil
+				return Empty()
 			}
 			// Comparison failed: One file ended before the other.
 			if oErr == io.EOF || cErr == io.EOF {
-				return "One file ended before the other.", nil
+				return Output("One file ended before the other.", path, StatDifferentFile)
 			}
 			// Error out.
-			return "", fmt.Errorf("unable to read files: %v; %v", oErr, cErr)
+			return Error(fmt.Errorf("unable to read files: %v; %v", oErr, cErr))
 		}
 
 		// Comparison failed: File contents differ.
 		if !bytes.Equal(oBytes, cBytes) {
-			return "File content differs.", nil
+			return Output("File content differs.", path, StatDifferentFile)
 		}
 
 		// Offset both files relative to current position.

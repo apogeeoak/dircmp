@@ -9,6 +9,12 @@ type Result struct {
 	Error  error
 }
 
+var empty = Result{}
+
+func Empty() Result {
+	return empty
+}
+
 func Error(err error) Result {
 	return Result{Error: err, Stat: StatError}
 }
@@ -19,6 +25,10 @@ func Output(output, path string, stat StatType) Result {
 
 func Stat(stat StatType) Result {
 	return Result{Stat: stat}
+}
+
+func (r Result) IsEmpty() bool {
+	return r == empty
 }
 
 func (r Result) String() string {
