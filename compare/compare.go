@@ -147,7 +147,7 @@ func compareFiles(config *Config, orig fs.DirEntry, comp fs.DirEntry, path strin
 	return compareFilesRead(config, oFile, cFile, offset)
 }
 
-func compareFilesRead(config *Config, orig *os.File, comp *os.File, offset int64) (string, error) {
+func compareFilesRead(config *Config, orig io.ReadSeeker, comp io.ReadSeeker, offset int64) (string, error) {
 	oBytes := make([]byte, config.SampleSize)
 	cBytes := make([]byte, config.SampleSize)
 
