@@ -67,14 +67,14 @@ func compare(config *Config, dir string, channel chan Result, wait *sync.WaitGro
 
 		// Branch on directory or file.
 		if cEntry.IsDir() {
-			compareDirectoriesAsync(config, oEntry, cEntry, path, channel, wait)
+			compareDirectoriesParallel(config, oEntry, cEntry, path, channel, wait)
 		} else {
-			go compareFilesAsync(config, oEntry, cEntry, path, channel, wait)
+			go compareFilesParallel(config, oEntry, cEntry, path, channel, wait)
 		}
 	}
 }
 
-func compareDirectoriesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
+func compareDirectoriesParallel(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	// Comparison failed on non-empty string.
@@ -86,7 +86,7 @@ func compareDirectoriesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry,
 	}
 }
 
-func compareFilesAsync(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
+func compareFilesParallel(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, channel chan Result, wait *sync.WaitGroup) {
 	defer wait.Done()
 	channel <- Stat(StatSearchedFile)
 
@@ -166,7 +166,7 @@ func compareFilesRead(config *Config, orig *os.File, comp *os.File, offset int64
 				return "One file ended before the other.", nil
 			}
 			// Error out.
-			return "", fmt.Errorf("compareFiles original %s; compared %s", oErr, cErr)
+			return "", fmt.Errorf("unable to read files: %v; %v", oErr, cErr)
 		}
 
 		// Comparison failed: File contents differ.

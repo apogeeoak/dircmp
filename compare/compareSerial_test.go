@@ -8,11 +8,11 @@ import (
 	"github.com/apogeeoak/dircmp/lib/test"
 )
 
-func TestCompareSyncBasic(t *testing.T) {
+func TestCompareSerialBasic(t *testing.T) {
 	config := setupConfigBasic()
 	want := "Searched 8 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 0 error(s)."
 
-	stats, err := compare.CompareSync(config)
+	stats, err := compare.CompareSerial(config)
 	fmt.Println(stats)
 
 	if err != nil {
@@ -23,11 +23,11 @@ func TestCompareSyncBasic(t *testing.T) {
 	}
 }
 
-func TestCompareSyncLarge(t *testing.T) {
+func TestCompareSerialLarge(t *testing.T) {
 	config := setupConfigLarge()
 	want := compareSameRegex
 
-	stats, err := compare.CompareSync(config)
+	stats, err := compare.CompareSerial(config)
 	fmt.Println(stats)
 
 	if err != nil {
@@ -38,14 +38,14 @@ func TestCompareSyncLarge(t *testing.T) {
 	}
 }
 
-func TestCompareSyncEntire(t *testing.T) {
+func TestCompareSerialEntire(t *testing.T) {
 	// Require the long flag to be set in order to run this long running test.
 	test.RequireLong(t)
 
 	config := setupConfigEntire()
 	want := compareSameRegex
 
-	stats, err := compare.CompareSync(config)
+	stats, err := compare.CompareSerial(config)
 	fmt.Println(stats)
 
 	if err != nil {
@@ -56,11 +56,11 @@ func TestCompareSyncEntire(t *testing.T) {
 	}
 }
 
-func TestCompareSyncError(t *testing.T) {
+func TestCompareSerialError(t *testing.T) {
 	config := setupConfigError()
 	want := "Searched 9 file(s), 4 file(s) different, 2 director(ies) different, 6 total entr(ies) different. 2 error(s)."
 
-	stats, err := compare.CompareSync(config)
+	stats, err := compare.CompareSerial(config)
 	fmt.Println(stats)
 
 	if err != nil {
@@ -71,25 +71,25 @@ func TestCompareSyncError(t *testing.T) {
 	}
 }
 
-func BenchmarkCompareSyncBasic(b *testing.B) {
+func BenchmarkCompareSerialBasic(b *testing.B) {
 	defer test.Quiet()()
 	config := setupConfigBasic()
 
 	for i := 0; i < b.N; i++ {
-		compare.CompareSync(config)
+		compare.CompareSerial(config)
 	}
 }
 
-func BenchmarkCompareSyncLarge(b *testing.B) {
+func BenchmarkCompareSerialLarge(b *testing.B) {
 	defer test.Quiet()()
 	config := setupConfigLarge()
 
 	for i := 0; i < b.N; i++ {
-		compare.CompareSync(config)
+		compare.CompareSerial(config)
 	}
 }
 
-func BenchmarkCompareSyncEntire(b *testing.B) {
+func BenchmarkCompareSerialEntire(b *testing.B) {
 	// Require the long flag to be set in order to run this long running benchmark.
 	test.RequireLongBenchmark(b)
 
@@ -97,6 +97,6 @@ func BenchmarkCompareSyncEntire(b *testing.B) {
 	config := setupConfigEntire()
 
 	for i := 0; i < b.N; i++ {
-		compare.CompareSync(config)
+		compare.CompareSerial(config)
 	}
 }

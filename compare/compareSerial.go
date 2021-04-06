@@ -8,7 +8,7 @@ import (
 	"github.com/apogeeoak/dircmp/lib/collection"
 )
 
-func CompareSync(config *Config) (*Stats, error) {
+func CompareSerial(config *Config) (*Stats, error) {
 	// Ensure starting directories exist.
 	if err := directoriesExists(config.Original, config.Compared); err != nil {
 		return nil, err
@@ -45,16 +45,16 @@ func CompareSync(config *Config) (*Stats, error) {
 
 			// Branch on directory or file.
 			if cEntry.IsDir() {
-				compareDirectoriesSync(config, oEntry, cEntry, path, directories, stats)
+				compareDirectoriesSerial(config, oEntry, cEntry, path, directories, stats)
 			} else {
-				compareFilesSync(config, oEntry, cEntry, path, stats)
+				compareFilesSerial(config, oEntry, cEntry, path, stats)
 			}
 		}
 	}
 	return stats, nil
 }
 
-func compareDirectoriesSync(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, directories *collection.Stack, stats *Stats) {
+func compareDirectoriesSerial(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, directories *collection.Stack, stats *Stats) {
 	// Comparison failed on non-empty string.
 	if cmp := compareDirectories(orig, comp); cmp != "" {
 		process(Output(cmp, path, StatDifferentDirectory), stats)
@@ -63,7 +63,7 @@ func compareDirectoriesSync(config *Config, orig fs.DirEntry, comp fs.DirEntry, 
 	}
 }
 
-func compareFilesSync(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, stats *Stats) {
+func compareFilesSerial(config *Config, orig fs.DirEntry, comp fs.DirEntry, path string, stats *Stats) {
 	stats.Add(StatSearchedFile)
 	// Comparison failed on non-empty string.
 	cmp, err := compareFiles(config, orig, comp, path)
